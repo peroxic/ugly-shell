@@ -1,5 +1,4 @@
 import socket
-import subprocess
 import threading
 import logging
 import time
@@ -59,8 +58,7 @@ def handle_client(client_socket, shell_id):
 
                 else:
                     if current_shell == shell_id:
-                        output = subprocess.run(command, shell=True, capture_output=True, text=True)
-                        response = output.stdout + output.stderr
+                        response = f"Executing command: {command}"  # Simulating command execution
                     else:
                         response = f"Shell {shell_id} is not active"
 
